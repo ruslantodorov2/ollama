@@ -28,6 +28,7 @@ import (
 	"github.com/ollama/ollama/discover"
 	"github.com/ollama/ollama/envconfig"
 	"github.com/ollama/ollama/format"
+	"github.com/ollama/ollama/grammar"
 	"github.com/ollama/ollama/llama"
 	"github.com/ollama/ollama/runners"
 )
@@ -610,29 +611,6 @@ func (s *llmServer) WaitUntilRunning(ctx context.Context) error {
 	}
 }
 
-var grammarJSON = `
-root   ::= object
-value  ::= object | array | string | number | ("true" | "false" | "null") ws
-object ::=
-  "{" ws (
-            string ":" ws value
-    ("," ws string ":" ws value)*
-  )? "}" ws
-array  ::=
-  "[" ws (
-            value
-    ("," ws value)*
-  )? "]" ws
-string ::=
-  "\"" (
-    [^"\\\x7F\x00-\x1F] |
-    "\\" (["\\/bfnrt] | "u" [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F]) # escapes
-  )* "\"" ws
-number ::= ("-"? ([0-9] | [1-9] [0-9]*)) ("." [0-9]+)? ([eE] [-+]? [0-9]+)? ws
-# Optional space: by convention, applied in this grammar after literal chars when allowed
-ws ::= ([ \t\n] ws)?
-`
-
 const maxBufferSize = 512 * format.KiloByte
 
 type ImageData struct {
@@ -723,19 +701,20 @@ func (s *llmServer) Completion(ctx context.Context, req CompletionRequest, fn fu
 	}
 
 	if len(req.Format) > 0 {
+		var schema []byte
 		switch {
 		case bytes.Equal(req.Format, []byte(`"json"`)):
-			request["grammar"] = grammarJSON
+			schema = []byte("{}")
 		case bytes.HasPrefix(req.Format, []byte("{")):
-			// User provided a JSON schema
-			g := llama.SchemaToGrammar(req.Format)
-			if g == nil {
-				return fmt.Errorf("invalid JSON schema in format")
-			}
-			request["grammar"] = string(g)
+			schema = req.Format
 		default:
 			return errors.New(`invalid format: expected "json" or a JSON schema`)
 		}
+		g, err := grammar.FromSchema(nil, schema)
+		if err != nil {
+			return fmt.Errorf("failed to parse grammar: %v", err)
+		}
+		request["grammar"] = g
 	}
 
 	// Handling JSON marshaling with special characters unescaped.
