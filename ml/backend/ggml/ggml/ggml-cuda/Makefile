@@ -11,54 +11,18 @@ NVCC_PREPEND_FLAGS= \
 NVCC_APPEND_FLAGS= \
 	# -DGGML_CUDA_USE_GRAPHS=1 \
 
-ALL_SOURCES=$(wildcard *.cu)
-FATTN_SOURCES=$(wildcard fattn*.cu)
+OBJECTS+= \
+	$(patsubst %.cu,%.o,$(wildcard *.cu)) \
+	$(patsubst %.cu,%.o,$(wildcard template-instances/*.cu)) \
 
-SOURCES= \
-	$(filter-out $(FATTN_SOURCES),$(ALL_SOURCES)) \
-	$(wildcard template-instances/mmq*.cu) \
+libggml-cuda_v11.so: CUDA_ARCHS?=50;52;53;60;61;62;70;72;75;80;86
+libggml-cuda_v12.so: CUDA_ARCHS?=60;61;62;70;72;75;80;86;87;89;90;90a
 
-ifneq ($(OLLAMA_FAST_BUILD),)
-NVCC_APPEND_FLAGS+=-DGGML_DISABLE_FLASH_ATTN
-else
-SOURCES+= \
-	$(FATTN_SOURCES) \
-	$(wildcard template-instances/fattn-wmma*.cu) \
-	$(wildcard template-instances/fattn-vec*q4_0-q4_0.cu) \
-	$(wildcard template-instances/fattn-vec*q8_0-q8_0.cu) \
-	$(wildcard template-instances/fattn-vec*f16-f16.cu)
-endif
-
-all: cuda_v11 cuda_v12
-
-cuda_v11: CUDA_ARCHS?=50;52;53;60;61;62;70;72;75;80;86
-cuda_v11: OBJECTS=$(patsubst %.cu,%.v11.o,$(SOURCES))
-
-cuda_v12: CUDA_ARCHS?=60;61;62;70;72;75;80;86;87;89;90;90a
-cuda_v12: OBJECTS=$(patsubst %.cu,%.v12.o,$(SOURCES))
-
-rocm: CPPFLAGS+=-DGGML_USE_HIP
-rocm: OBJECTS=$(patsubst %.cu,%.rocm.o,$(SOURCES))
-
-ifeq ($(OS),Windows_NT)
-cuda_v11: libggml_cuda_v11.dll
-cuda_v12: libggml_cuda_v12.dll
-rocm: libggml_rocm.dll
-else
-cuda_v11: libggml_cuda_v11.a
-cuda_v12: libggml_cuda_v12.a
-rocm: libggml_rocm.a
-endif
-
-clean:
-	$(RM) *.a *.o template-instances/*.o
-
-%.v11.o %.v12.o %.rocm.o: %.cu
+%.o: %.cu
 	$(NVCC) $(NVCC_PREPEND_FLAGS) -c $< -o $@ $(NVCC_APPEND_FLAGS)
 
-.SECONDEXPANSION:
-%.a: $$(OBJECTS)
-	$(AR) rcs $@ $^
+%.so: $(OBJECTS)
+	$(CC) $(LDFLAGS) -shared -o $@ $^
 
-%.dll: $$(OBJECTS)
-	$(NVCC) -shared -o $@ $^
+clean:
+	$(RM) $(OBJECTS) *.so
