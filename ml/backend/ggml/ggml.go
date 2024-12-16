@@ -15,6 +15,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"sync"
@@ -66,6 +67,28 @@ func (d device) LogValue() slog.Value {
 }
 
 var devices = sync.OnceValue(func() []device {
+	paths, ok := os.LookupEnv("LD_LIBRARY_PATH")
+	if !ok {
+		paths = "/usr/local/lib:/usr/lib"
+	}
+
+	for _, path := range filepath.SplitList(paths) {
+		matches, err := filepath.Glob(filepath.Join(path, "*.so"))
+		if err != nil {
+			slog.Error("failed to glob", "path", path, "error", err)
+			continue
+		}
+
+		for _, match := range matches {
+			func() {
+				cmatch := C.CString(match)
+				defer C.free(unsafe.Pointer(cmatch))
+
+				C.ggml_backend_load(cmatch)
+			}()
+		}
+	}
+
 	s := make([]device, C.ggml_backend_dev_count())
 	for i := range s {
 		s[i] = device{C.ggml_backend_dev_get(C.size_t(i))}

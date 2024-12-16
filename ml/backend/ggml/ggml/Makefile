@@ -4,10 +4,12 @@ CXXFLAGS= \
 	-std=c++11 \
 
 CPPFLAGS= \
+	-O3 \
 	-I$(SRCDIR) \
 	-I$(SRCDIR)/include \
 	-I$(SRCDIR)/ggml-cpu \
 	-fPIC \
+	-DNDEBUG \
 	-DGGML_BACKEND_DL \
 	-DGGML_BACKEND_SHARED \
 
@@ -41,6 +43,7 @@ ifeq ($(shell uname),Darwin)
 CPPFLAGS+= \
 	-DACCELERATE_NEW_LAPACK \
 	-DACCELERATE_LAPACK_ILP64 \
+	-DGGML_USE_ACCELERATE \
 	-DGGML_BLAS_USE_ACCELERATE \
 
 LDFLAGS+=-framework Accelerate

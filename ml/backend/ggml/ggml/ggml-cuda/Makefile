@@ -9,6 +9,7 @@ NVCC_PREPEND_FLAGS= \
 	$(foreach ARCH,$(subst ;, ,$(CUDA_ARCHS)),--generate-code=arch=compute_$(ARCH),code=sm_$(ARCH)) \
 
 NVCC_APPEND_FLAGS= \
+	-DGGML_USE_CUDA \
 	# -DGGML_CUDA_USE_GRAPHS=1 \
 
 OBJECTS+= \
