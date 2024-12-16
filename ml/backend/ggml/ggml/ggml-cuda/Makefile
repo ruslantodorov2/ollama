@@ -51,8 +51,7 @@ rocm: libggml_rocm.a
 endif
 
 clean:
-	$(RM) *.a *.o
-	$(RM) template-instances/*.o
+	$(RM) *.a *.o template-instances/*.o
 
 %.v11.o %.v12.o %.rocm.o: %.cu
 	$(NVCC) $(NVCC_PREPEND_FLAGS) -c $< -o $@ $(NVCC_APPEND_FLAGS)
